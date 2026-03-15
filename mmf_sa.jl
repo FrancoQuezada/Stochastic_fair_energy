@@ -54,6 +54,7 @@ function solve_lex_step(inst::InstanceM, iter::Int64, optim::Vector{Float64},sol
     
     
     set_silent(model)
+    set_attribute(model, "CPXPARAM_TimeLimit", 60*60)
     optimize!(model)
     term=termination_status(model)
     pstat=primal_status(model)
@@ -109,8 +110,8 @@ function lexico(inst::InstanceM)
     for k in 1:inst.J
         obj, step_time=solve_lex_step(inst,k,ω,x_sol)
         total_solve_time+=step_time
-        if !x_sol.status
-            println("Lexicographic algorithm stopped at step ", k, " (no solution values).")
+        if !x_sol.status || total_solve_time > 60*60
+            println("Lexicographic algorithm stopped at step ", k, " (no solution values). Solution time : ", total_solve_time)
             break
         end
         ω[k]=deepcopy(obj)

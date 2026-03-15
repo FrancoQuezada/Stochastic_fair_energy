@@ -22,6 +22,7 @@ function solve_lex_pea_step(inst::InstanceM, iter::Int64, optim::Vector{Float64}
     @objective(model, Max, iter*zeta[iter] - sum(daux[iter,:]))
 
     set_silent(model)
+    set_attribute(model, "CPXPARAM_TimeLimit", 60*60)
     optimize!(model)
     step_time = round(solve_time(model), digits=2)
 
@@ -38,6 +39,10 @@ function lexico_mmf_pea_targets(inst::InstanceM)
     for k in 1:inst.J
         obj, p_sol, step_time=solve_lex_pea_step(inst, k, ω)
         total_solve_time+=step_time
+        if total_solve_time > 60*60
+            println("Lexicographic algorithm stopped at time ", total_solve_time, " (no solution values).")
+            break
+        end
         ω[k]=obj
         p_last.=p_sol
     end
