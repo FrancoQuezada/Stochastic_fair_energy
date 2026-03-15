@@ -69,15 +69,17 @@ function solve_lex_step(inst::InstanceM, iter::Int64, optim::Vector{Float64},sol
         sol.G=value.(G)
         sol.w=zeros(inst.J,inst.T)
         sol.x=zeros(inst.J,inst.T)
-        sol.time=round(solve_time(model), digits=2)
+        step_time=round(solve_time(model), digits=2)
+        sol.time=step_time
         sol.status=true
         sol.id=inst.id
         # zio=[sol.I[j,t]*sol.G[j,t]==0 for j in 1:inst.J, t in 1:inst.T]
         # println(all(zio))
         # sol=Solution(sTotAux,iAux,GAux,xAux,wAux,zAux,yAux,pAux,costsAux,true,solTime,inst.id)
-        return objective_value(model)
+        return objective_value(model), step_time
     else
-        println("Lex step ", iter, " failed: term=", term, ", primal=", pstat, ", time=", round(solve_time(model), digits=2))
+        step_time=round(solve_time(model), digits=2)
+        println("Lex step ", iter, " failed: term=", term, ", primal=", pstat, ", time=", step_time)
         sol.costs=fill(Inf,inst.J)
         sol.y=zeros(inst.J,inst.T)
         sol.z=zeros(inst.J,inst.T)
@@ -87,11 +89,11 @@ function solve_lex_step(inst::InstanceM, iter::Int64, optim::Vector{Float64},sol
         sol.G=zeros(inst.J,inst.T)
         sol.w=zeros(inst.J,inst.T)
         sol.x=zeros(inst.J,inst.T)
-        sol.time=round(solve_time(model), digits=2)
+        sol.time=step_time
         sol.status=false
         sol.id=inst.id
         # sol=Solution(sTotAux,iAux,GAux,xAux,wAux,zAux,yAux,pAux,costsAux,false,solTime,inst.id)   
-        return 0  
+        return 0, step_time
     end
 end 
 
@@ -103,14 +105,17 @@ function lexico(inst::InstanceM)
     println("Lexicographic Algorithm")
     ω=zeros(inst.J) #initialize omega
     x_sol=SolutionM() #initial empty solution
+    total_solve_time=0.0
     for k in 1:inst.J
-        obj=solve_lex_step(inst,k,ω,x_sol)
+        obj, step_time=solve_lex_step(inst,k,ω,x_sol)
+        total_solve_time+=step_time
         if !x_sol.status
             println("Lexicographic algorithm stopped at step ", k, " (no solution values).")
             break
         end
         ω[k]=deepcopy(obj)
     end
+    x_sol.time=round(total_solve_time, digits=2)
     println("end")
     println("##########################################################")
     # println([(inst.delta)*sum(inst.nu[j,t]*inst.d[j,t] for t in 1:inst.T) for j in 1:inst.J]) #for debug

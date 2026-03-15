@@ -11,6 +11,7 @@ function solveMulti(inst::InstanceM,fairness::String,lambdaS=zeros(10,10), EEV=f
         return lexico_mmf_sa(inst)
     end
     mmf_pea_target_scenarios=nothing
+    mmf_extra_solve_time=0.0
     scenarioTree=inst.tree
     model = Model(CPLEX.Optimizer)
     timePeriods=createTime(scenarioTree)
@@ -57,7 +58,7 @@ function solveMulti(inst::InstanceM,fairness::String,lambdaS=zeros(10,10), EEV=f
             sum(scenario_prob[s]*((grid_total[s]-sum(sum(costNode[k,n] for k in 1:inst.J) for n in scenarioTree.scenarios[s]))/grid_total[s])*grid_house[s][j] for s in eachindex(scenarioTree.scenarios)))
         end
     elseif fairness in ("LEXMMFPEA", "MMFPEA", "EMMFPEA")
-        assign_expected, assign_scenarios=lexico_mmf_pea_targets(inst)
+        assign_expected, assign_scenarios, mmf_extra_solve_time=lexico_mmf_pea_targets(inst)
         mmf_pea_target_scenarios=assign_scenarios
         @constraint(model, [j in 1:inst.J], sum(scenarioTree.rho[scenario[inst.T]]*sum(p[j,t] for t in scenario) for scenario in scenarioTree.scenarios)==assign_expected[j])
     elseif !(fairness in ("", "NONE"))
@@ -100,7 +101,7 @@ function solveMulti(inst::InstanceM,fairness::String,lambdaS=zeros(10,10), EEV=f
         GAux=value.(G)
         wAux=zeros(inst.J,inst.T)
         xAux=zeros(inst.J,inst.T)
-        solTime=round(solve_time(model), digits=2)
+        solTime=round(mmf_extra_solve_time + solve_time(model), digits=2)
         sol=SolutionM(sTotAux,iAux,GAux,xAux,wAux,zAux,yAux,pAux,costsAux,true,solTime,inst.id)
     else
         costsAux=fill(Inf,inst.J)
@@ -113,7 +114,7 @@ function solveMulti(inst::InstanceM,fairness::String,lambdaS=zeros(10,10), EEV=f
         wAux=zeros(inst.J,inst.T)
         xAux=zeros(inst.J,inst.T)
         regret=fill(Inf,(inst.J,inst.T))
-        solTime=round(solve_time(model), digits=2)  
+        solTime=round(mmf_extra_solve_time + solve_time(model), digits=2)  
         sol=SolutionM(sTotAux,iAux,GAux,xAux,wAux,zAux,yAux,pAux,costsAux,false,solTime,inst.id)
     end
     if fairness in ("PEA", "PAE", "PPEA", "EPPEA", "SA", "PSA", "ESA", "LEXMMFPEA", "MMFPEA", "EMMFPEA")
@@ -148,7 +149,7 @@ function _regret_matrix(inst::InstanceM, sol::SolutionM, fairness::String)
         target=[(sum(inst.c_pv[n] for n in scenario)/sum(inst.d[k,n] for k in 1:inst.J, n in scenario))*sum(inst.d[j,n] for n in scenario) for j in 1:inst.J, scenario in scen]
         return abs.((obtained.-target)./max.(target,TOL))
     elseif fairness in ("LEXMMFPEA", "MMFPEA", "EMMFPEA")
-        _, target=lexico_mmf_pea_targets(inst)
+        _, target, _=lexico_mmf_pea_targets(inst)
         return abs.((obtained.-target)./max.(target,TOL))
     elseif fairness in ("SA", "PSA", "ESA", "LEXMMFSA", "MMFSA")
         reg=zeros(inst.J, length(scen))
@@ -242,10 +243,11 @@ function run_fairness_instance_report(inst_folder::String="inst/inst2020";
 
         for fair in fairness_list
             t_start=time()
+            reg_from_solve=nothing
             if fair in ("LEXMMFSA","MMFSA","","NONE")
                 sol=solveMulti(inst,fair)
             else
-                sol,_=solveMulti(inst,fair)
+                sol, reg_from_solve=solveMulti(inst,fair)
             end
             run_time=time()-t_start
 
@@ -257,6 +259,9 @@ function run_fairness_instance_report(inst_folder::String="inst/inst2020";
                 if fair in ("","NONE")
                     reg=fill(NaN,inst.J,length(inst.tree.scenarios))
                     regret_expected=NaN
+                elseif reg_from_solve !== nothing
+                    reg=reg_from_solve
+                    regret_expected=sum(probs[s]*sum(reg[:,s])/inst.J for s in 1:size(reg,2))/total_prob
                 else
                     reg=_regret_matrix(inst,sol,fair)
                     regret_expected=sum(probs[s]*sum(reg[:,s])/inst.J for s in 1:size(reg,2))/total_prob
@@ -380,10 +385,11 @@ function run_single_fairness_instance(;
     df_house[!,"ModelSolveTimeSec"]=Float64[]
 
     t_start=time()
+    reg_from_solve=nothing
     if fairness in ("LEXMMFSA","MMFSA","","NONE")
         sol=solveMulti(inst,fairness)
     else
-        sol,_=solveMulti(inst,fairness)
+        sol, reg_from_solve=solveMulti(inst,fairness)
     end
     run_time=time()-t_start
 
@@ -395,6 +401,9 @@ function run_single_fairness_instance(;
         if fairness in ("","NONE")
             reg=fill(NaN,inst.J,length(inst.tree.scenarios))
             regret_expected=NaN
+        elseif reg_from_solve !== nothing
+            reg=reg_from_solve
+            regret_expected=sum(probs[s]*sum(reg[:,s])/inst.J for s in 1:size(reg,2))/total_prob
         else
             reg=_regret_matrix(inst,sol,fairness)
             regret_expected=sum(probs[s]*sum(reg[:,s])/inst.J for s in 1:size(reg,2))/total_prob

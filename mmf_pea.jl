@@ -23,18 +23,21 @@ function solve_lex_pea_step(inst::InstanceM, iter::Int64, optim::Vector{Float64}
 
     set_silent(model)
     optimize!(model)
+    step_time = round(solve_time(model), digits=2)
 
     if has_values(model)
-        return objective_value(model), value.(p)
+        return objective_value(model), value.(p), step_time
     end
-    return 0.0, zeros(inst.J, scenarioTree.V)
+    return 0.0, zeros(inst.J, scenarioTree.V), step_time
 end
 
 function lexico_mmf_pea_targets(inst::InstanceM)
     ω=zeros(inst.J)
     p_last=zeros(inst.J, inst.tree.V)
+    total_solve_time=0.0
     for k in 1:inst.J
-        obj, p_sol=solve_lex_pea_step(inst, k, ω)
+        obj, p_sol, step_time=solve_lex_pea_step(inst, k, ω)
+        total_solve_time+=step_time
         ω[k]=obj
         p_last.=p_sol
     end
@@ -43,5 +46,5 @@ function lexico_mmf_pea_targets(inst::InstanceM)
     scenario_prob=[scenarioTree.rho[scenario[inst.T]] for scenario in scenarioTree.scenarios]
     scenario_target=[sum(p_last[j,n] for n in scenario) for j in 1:inst.J, scenario in scenarioTree.scenarios]
     expected_target=[sum(scenario_prob[s]*scenario_target[j,s] for s in eachindex(scenarioTree.scenarios)) for j in 1:inst.J]
-    return expected_target, scenario_target
+    return expected_target, scenario_target, round(total_solve_time, digits=2)
 end
