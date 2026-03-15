@@ -71,7 +71,7 @@ for fairness in "${fairness_list[@]}"; do
     log_file="$LOG_DIR/${fairness}_S${s}_C${c}_P${p}.log"
     run_key="${fairness}|${tree}"
 
-    if [[ ! -x "$SCRIPT_DIR/$script" ]]; then
+    if [[ ! -e "$SCRIPT_DIR/$script" ]]; then
       echo "ERROR: missing executable $script" >&2
       exit 1
     fi
@@ -81,7 +81,7 @@ for fairness in "${fairness_list[@]}"; do
       echo "CMD: $SCRIPT_DIR/$script > $log_file 2>&1 &"
       cmd_count=$((cmd_count + 1))
     else
-      "$SCRIPT_DIR/$script" >"$log_file" 2>&1 &
+      bash "$SCRIPT_DIR/$script" >"$log_file" 2>&1 &
       pids["$run_key"]=$!
       run_keys["$run_key"]="$log_file"
     fi
