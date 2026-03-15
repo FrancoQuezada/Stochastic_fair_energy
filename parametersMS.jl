@@ -213,6 +213,53 @@ function createDemands(J::Int64,avg::Float64,dev::Float64,tree::Tree)
     return permutedims(demand,[2,1]), permutedims(demand_det,[2,1])
 end
 
+function pea_scenarios_feasible(d::Array{Float64,2}, c_pv::Array{Float64,1}, tree::Tree)
+    for scenario in tree.scenarios
+        total_pv=sum(c_pv[n] for n in scenario)
+        total_demand=sum(d[j,n] for j in 1:size(d,1), n in scenario)
+        if total_pv > total_demand + 1e-8
+            return false
+        end
+    end
+    return true
+end
+
+function repairDemandsForPEA!(d::Array{Float64,2}, c_pv::Array{Float64,1}, tree::Tree)
+    J=size(d,1)
+    for n in 1:tree.V
+        house_totals=d[:,n]
+        total_demand=sum(house_totals)
+        deficit=c_pv[n]-total_demand
+        if deficit > 1e-8
+            weights=total_demand > 0 ? house_totals./total_demand : fill(1.0/J, J)
+            for j in 1:J
+                d[j,n]+=deficit*weights[j]
+            end
+        end
+    end
+    return d
+end
+
+function deterministicDemandFromScenarios(d::Array{Float64,2}, tree::Tree)
+    timePeriods=createTime(tree)
+    d_det=zeros(size(d,1), tree.S*tree.T)
+    for t in 1:(tree.S*tree.T)
+        nodes_t=[n for n in 1:tree.V if timePeriods[n] == t]
+        for j in 1:size(d,1)
+            d_det[j,t]=isempty(nodes_t) ? 0.0 : mean(d[j,n] for n in nodes_t)
+        end
+    end
+    return d_det
+end
+
+function createDemandsFeasible(J::Int64,avg::Float64,dev::Float64,tree::Tree,c_pv::Array{Float64,1})
+    demand, _=createDemands(J,avg,dev,tree)
+    repairDemandsForPEA!(demand,c_pv,tree)
+    pea_scenarios_feasible(demand,c_pv,tree) || error("No se pudo reparar la demanda para garantizar factibilidad PEA.")
+    demand_det=deterministicDemandFromScenarios(demand,tree)
+    return demand, demand_det
+end
+
 function generateInstance(NBstage::Int64,childs::Int64,periods::Int64, J::Int64,inFile::String,theta::Float64,avg::Float64,dev::Float64)
     # nodes=Int(periods*((1-childs^NBstage)/(1-childs)))
     Random.seed!(deterministic_seed(NBstage, childs, periods, J, inFile, theta, avg, dev))
@@ -229,7 +276,7 @@ function generateInstance(NBstage::Int64,childs::Int64,periods::Int64, J::Int64,
     inst.mu=0.05*100
     inst.beta=0.1*100
     #####################################################################
-    inst.d, inst.d_det=createDemands(J,avg,dev,inst.tree)
+    inst.d, inst.d_det=createDemandsFeasible(J,avg,dev,inst.tree,inst.c_pv)
     # dda1=[]
     # ddaDet1=[]
     # for j in 1:J
