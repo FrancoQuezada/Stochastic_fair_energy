@@ -29,7 +29,7 @@ if [[ -z "$FAIRNESS_SET" ]]; then
 fi
 
 # Formato: "NBstage:childs:periods;NBstage:childs:periods;..."
-TREE_SET="${TREE_SET:-6:2:4}"
+TREE_SET="${TREE_SET:-6:2:4,6:6:4,8:2:3,8:6:3}"
 
 # Sets de parametros numéricos (coma separada)
 J_SET="${J_SET:-5,10}"
