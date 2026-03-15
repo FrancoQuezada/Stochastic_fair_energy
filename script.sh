@@ -18,7 +18,7 @@ fi
 SCRIPT_NAME="${SCRIPT_NAME:-script.sh}"
 INST_FOLDER="${INST_FOLDER:-$DEFAULT_INST_FOLDER}"
 INSTANCE_FROM="${INSTANCE_FROM:-1}"
-INSTANCE_TO="${INSTANCE_TO:-1}"
+INSTANCE_TO="${INSTANCE_TO:-10}"
 
 # Medidas disponibles: NONE, PEA, SA, LEXMMFPEA, LEXMMFSA
 # Este script es el motor genérico y requiere FAIRNESS_SET explícito.
@@ -32,10 +32,10 @@ fi
 TREE_SET="${TREE_SET:-6:2:4}"
 
 # Sets de parametros numéricos (coma separada)
-J_SET="${J_SET:-5}"
-THETA_SET="${THETA_SET:-0.2}"
+J_SET="${J_SET:-5,10}"
+THETA_SET="${THETA_SET:-0.2,0.6}"
 AVG_D_SET="${AVG_D_SET:-100.0}"
-DEV_D_SET="${DEV_D_SET:-10.0}"
+DEV_D_SET="${DEV_D_SET:-10.0,20.0}"
 
 OUT_CSV="${OUT_CSV:-fairness_config_set_report.csv}"
 OUT_CSV_HOUSE="${OUT_CSV_HOUSE:-fairness_config_set_report_by_house.csv}"
